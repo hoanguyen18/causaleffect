@@ -1,0 +1,215 @@
+---
+title: 'Causal Reasoning Work From Home'
+date: "October 12th"
+output:
+  html_document:
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(tibble)
+library(tidyverse)
+```
+
+```{css style settings, echo = FALSE}
+.note {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 14px;
+    border-left: 5px solid #1f77b4;
+    background-color: #def;
+}
+
+.exercise {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 14px;
+    border-left: 5px solid #ff7f0e;
+    background-color: #fed;
+}
+```
+
+# Intro
+
+One of the important debates of 2022 in the business community has been what policies companies should have for working from home. During the lockdown, companies were forced to adapt to online work, and many employees discovered that they preferred to work from home. Meanwhile many managers are more skeptical - it seems harder to communicate with remote employees, not to mention monitor their productivity. Now that the worst of the pandemic appears to be in the past, companies have the opportunity to make more deliberate choices about their work-from-home policies. Ideally, this should be an evidence-based decision. But finding clear evidence is hard, and there some studies have apparently contradictory results (see [this article in the Guardian](https://www.theguardian.com/business/2022/aug/28/remote-work-home-office-debate-pandemic) for more discussion and links)
+
+In this assignment, you will use the skills and concepts we are learning in this course to explore the challenges of estimating the causal effect of working from home on employee productivity.
+
+# Scenario
+
+You have been hired as a consultant for a large Canadian telecommunications firm. Prior to the pandemic, the majority of employees worked at an office tower in downtown Toronto. When the pandemic hit, workers were forced to work from home for several months. When the office re-opened employees were allowed to choose whether they wanted to work from home or the office. This flexible policy has been maintained for the last two years, and roughly half of all employees work primarily from home. Managers are worried about lost productivity, not to mention wasted office space. On the other hand, some vocal employees have made it clear that they have a strong preference for working from home. The company is evaluating three possible policies that it could adopt going forward:
+
+a. Force all workers to work in the office
+b. Force all employees to commit to work from home at least 3 days a week (so that the company can get rid of some under utilized office space)
+c. Continue to allow employees to flexibly choose their work arrangement
+
+The company's main concern is the effect of working from home on worker productivity. This is a big unknown for them, and it is likely to be much more important than the cost of office space or any fallout from disappointed workers.
+
+To estimate the effect of working from home on productivity, the company ran an internal study. They collected data on 1000 employees, describing:
+
+ - Each employee's productivity over the last year (this is actually very hard to measure, but the company has did its best to combine multiple sources of information into a single normalized score)
+ - Whether each employee worked from home (it turns out that this is basically a binary variable - employees either switched to working mostly from home, or came back to the office as soon as possible)
+
+To the surprise of the managers, when they analyzed the data they found that employees who chose to work from home were more productive than those that returned to the office. Now the management team wants to know how much they should trust these results. It seems like such a simple measurement. Is it possible that there is some sort of bias?
+
+# Assignment
+:::{.exercise}
+
+1) Describe the internal study using Potential Outcomes notation:
+    a. What is the outcome variable?
+    b. What is treatment?
+    c. What are the potential outcomes?
+Make sure to describe what each variable means in this specific context, and also show the standard notation we are using in this class.
+
+#####
+ANSWER:
+a. Outcome variable is worker productivity (Y).
+b. Treatment is either treated "work from home" (Di = 1) or untreated "work at office" (Di = 0)
+c. We have 2 potential outcomes:
+Y_i^1 is the productivity of employees when working from home (treated, Di =1)
+Y_i^0 is the productivity of employees when working at office (untreated, Di = 0)
+
+
+2) Which average treatment effect (ATE, ATT, or ATU) is most relevant to the company when choosing their work-from-home policy? Define what each term means in this context and explain your reasoning.
+
+#####
+ANSWER:
+ATE is the average treatment effect. In this context, it is the difference effect of each employee when work from home and work at office
+ATT is the average treatment effect when employee work from home
+ATU is the average treatment effect when employee work at office
+
+In the case, ATE is the most relevant because it can compare treatments and measures the difference in mean productivity of  employees working from home and employees working at office. 
+ATE is a weighted combination of ATT and ATU.
+
+3) Run a test using simulated data to see if the results of the internal study could be due to strategic selection (what we might call "*self selection*" in this context):
+    a. Write a block of R code that generates data consistent with the following causal model:
+        - Each employee's productivity when working in the office is normally distributed with a mean 0 and standard deviation of 1
+        - The individual treatment effect $\delta_i$ for each employee is normally distributed with a mean 0 and standard deviation of 0.2
+        - Employees choose to work wherever they are more productive (i.e., they work from home if their individual treatment effect is positive)
+        - Generate potential outcomes $Y_i^0$ and $Y_i^1$ for each unit, and use the switching equation $Y_i = D_i Y_i^1 + (1-D_i)Y_i^0$ to generate the observed outcome.
+        - *Hint: So far in class, we have generated the potential outcomes first, and then measured the treatment effect as the difference between them: $\delta_i = Y_i^1 - Y_i^0$. But it is also possible to generate one potential outcome, and then the treatment effect, and set the second potential outcome using the treatment effect. For example, generate $Y_i^0$ and $\delta_i$ and then set $Y_i^1 = Y_i^0 + \delta_i$.*
+        
+```{r}
+
+
+set.seed(1000)
+simulate_data <- function(N){
+data <- tibble(
+  i = 1:N,
+  Y0 = rnorm(N, 0, 1), #Rnorm is a built-in function to simulate normal distribution rnorm(n, mean, sd) for productivity when not treated (work at office)
+  delta_i = rnorm(N, 0, 0.2), #the individual treatment effect 
+  D = if_else (delta_i>0, 1, 0), # If individual treatment effect is positive, worker choose to work from home, if not, they work at office
+  Y1 = Y0 + delta_i, #the productivity when treated (work from home) 
+  Y = ifelse(D==1, Y1, as.numeric(Y0)) # observed outcome variable
+)
+data
+}
+head(simulate_data(1000), 10)
+```
+
+Test the result:
+```{r}
+library(ggplot2)
+data <- simulate_data(1000)
+#plot the distribution of productivity in each group with `ggplot`:
+data %>% ggplot(aes(Y))+
+  geom_histogram() +
+  facet_wrap(~D)#Y0 means work at office, Y1 means work from home
+```
+
+b. Compute the SDO estimate for your simulated data.
+
+```{r}
+library(tidyverse)
+#generate Monte Carlo estimate to calculate more accurate SDO and examine the range of SDO
+mc_estimate <- function(s) { 
+  data<- simulate_data(1000)
+  
+  data %>% 
+    summarize(
+      SDO = sum(D*Y)/sum(D) - sum((1-D)*Y)/sum(1-D)
+    )}
+mc_estimate(1) #sample 1
+mc_estimates <- 1:1000 %>% 
+  map_df(mc_estimate, .id='sample') 
+#View the distribution of SDO in histogram
+mc_estimates %>% 
+  ggplot(aes(SDO)) +
+  geom_histogram()
+
+```
+
+c. Do you think your model offers a plausible explanation for the results that company found? Explain your reasoning.
+
+##ANSWER:
+The results company found is that employees who chose to work from home were more productive than those that returned to the office.
+
+The model offers a plausible explanation for this finding. In the model, the SDO in simulated data ranges from 0.02-0.3 and is a positive value. This reveals that mean productivity of employees work from home (treated) is higher than mean productivity of employees work at office (untreated). 
+
+
+4) Suppose that the model in part 3) is an accurate description of reality, at least for your client.
+    a. Compute the true sample ATE and use this to estimate the bias of the SDO estimator (note that your estimate will be a little different every time you run the code - that's OK).
+    
+```{r}
+  data<- simulate_data(1000) 
+  data %>% 
+    summarize(
+      SDO = sum(D*Y)/sum(D) - sum((1-D)*Y)/sum(1-D), #calculate SDO
+      sample_ATE = mean(Y1-Y0), #average 
+      SDO_bias = mean(SDO) - mean(sample_ATE) 
+    )
+```    
+
+  b. Is the bias you observe a result of selection bias, heterogeneous treatment effect bias, or both? Explain carefully.
+
+  
+```{r}
+# test if the bias is result of selection bias
+  data<- simulate_data(1000) 
+  data %>% 
+    summarize(
+      E_Y0_T = sum(D*Y0)/sum(D), #average untreated outcomes when treated 
+      E_Y0_U = mean(Y0)) #average untreated productivity
+```
+
+Since treated employees, on average, have different untreated outcomes than the observed untreated units, there is occurence of selection bias.
+
+```{r}
+# test if the bias is result of heterogeneous treatement effect
+  data<- simulate_data(1000) 
+  data %>% 
+    summarize(
+      ATT = sum(D*(Y1-Y0))/sum(D),
+      ATU = sum((1-D)*(Y1-Y0))/sum(1-D)
+    )
+```
+Since ATT is different from ATU, the result observed is a result of heterogenous effect treatment. 
+  
+  c. If the model is accurate, which work-from-home policy should the company choose? Why?
+
+#####
+ANSWER:
+Company should choose policy c. Continue to allow employees to flexibly choose their work arrangement. Because some employees have higher productivity when working at office, while some employees have higher productivity when working at home.
+
+5) What would you advise your client about how to interpret the results of the internal study?
+
+#####
+ANSWER:
+Some of the outstanding metrics to understand the results of this internal study are:
+1. The tibble data is the simulated data for 1000 employees, where each of them is assigned to group Work from home and Work at Office. It reveals the observed productivity for 1000 employees.
+2. SDO is the simplest possible causal estimator in terms of potential productivity. It reveals from the study that the employees work from home were more productive than those that returned to the office.
+3. However in the study, selection bias and heterogeneous treatment effect bias are observed. Selection bias implies that the sample obtained is not the representative of the population data. Heterogeneous treatment effect bias implies that the employees may be sorted into treatment groups by their difference in the effect of treatment.
+
+
+
+:::
+
+
+:::{.note}
+***Normally distributed variables***
+
+The normal distribution is defined by two parameters: the mean and standard deviation. We can indicate that a variable $X$ is normally distributed with mean $\mu$ and standard deviation $\sigma$ with the following mathematical notation:
+$$ X\sim \mathcal N(\mu,\sigma)$$
+In R, we can generate normally distributed variables with the `rnorm` function, which takes three arguments: the number of values to generate, the mean, and the standard deviation. For example, `rnorm(N,3,5)` generates N normally distributed observations with a mean of 3 and standard deviation of 5.
+:::
